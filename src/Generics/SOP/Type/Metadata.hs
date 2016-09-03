@@ -11,22 +11,22 @@ import Generics.SOP.NP
 import Generics.SOP.Sing
 import Generics.SOP.Universe
 
-data DatatypeInfo :: [[Type]] -> Type where
+data DatatypeInfo :: Type where
   -- Standard algebraic datatype
-  ADT     :: ModuleName -> DatatypeName -> NP ConstructorInfo xss -> DatatypeInfo xss
+  ADT     :: ModuleName -> DatatypeName -> [ConstructorInfo] -> DatatypeInfo
   -- Newtype
-  Newtype :: ModuleName -> DatatypeName -> ConstructorInfo '[x]   -> DatatypeInfo '[ '[x] ]
+  Newtype :: ModuleName -> DatatypeName -> ConstructorInfo   -> DatatypeInfo
 
-data ConstructorInfo :: [Type] -> Type where
+data ConstructorInfo :: Type where
   -- Normal constructor
-  Constructor :: ConstructorName -> ConstructorInfo xs
+  Constructor :: ConstructorName -> ConstructorInfo
   -- Infix constructor
-  Infix :: ConstructorName -> Associativity -> Fixity -> ConstructorInfo '[ x, y ]
+  Infix :: ConstructorName -> Associativity -> Fixity -> ConstructorInfo
   -- Record constructor
-  Record :: ConstructorName -> NP FieldInfo xs -> ConstructorInfo xs
+  Record :: ConstructorName -> [FieldInfo] -> ConstructorInfo
 
-data FieldInfo :: Type -> Type where
-  FieldInfo :: FieldName -> FieldInfo a
+data FieldInfo :: Type where
+  FieldInfo :: FieldName -> FieldInfo
 
 -- | The name of a datatype.
 type DatatypeName    = Symbol
@@ -43,75 +43,77 @@ type FieldName       = Symbol
 -- | The fixity of an infix constructor.
 type Fixity          = Nat
 
-type family Demoted (k :: Type) :: Type
-type instance Demoted (FieldInfo x)        = M.FieldInfo x
-type instance Demoted (ConstructorInfo xs) = M.ConstructorInfo xs
-type instance Demoted (DatatypeInfo xss)   = M.DatatypeInfo xss
-type instance Demoted (NP f xs)            = NP (WrapDemoted f) xs
-type instance Demoted Symbol               = String
-type instance Demoted Nat                  = Int
-type instance Demoted Associativity        = Associativity
+type family Demoted (k :: Type) (c :: r) :: Type
+type instance Demoted DatatypeInfo xss     = M.DatatypeInfo xss
+type instance Demoted ConstructorInfo xs   = M.ConstructorInfo xs
+type instance Demoted FieldInfo x          = M.FieldInfo x
+type instance Demoted [f] xs               = NP (WrapDemoted f) xs
+type instance Demoted Symbol _             = String
+type instance Demoted Nat _                = Int
+type instance Demoted Associativity _      = Associativity
 
-newtype WrapDemoted f a = WrappedDemoted { unWrapDemoted :: Demoted (f a) }
+newtype WrapDemoted f a = WrappedDemoted { unWrapDemoted :: Demoted f a }
 
-class Demote (a :: k) where
-  demote :: proxy a -> Demoted k
+class Demote (a :: k) (c :: r) where
+  demote :: proxy1 a -> proxy2 c -> Demoted k c
 
-instance KnownSymbol x => Demote x where
-  demote p = symbolVal p
+instance KnownSymbol x => Demote x c where
+  demote p _ = symbolVal p
 
-instance KnownNat x => Demote x where
-  demote p = fromInteger (natVal p)
+instance KnownNat x => Demote x c where
+  demote p _ = fromInteger (natVal p)
 
-instance Demote x => Demote ('FieldInfo x) where
-  demote _ = M.FieldInfo (demote (Proxy :: Proxy x))
+instance Demote x '() => Demote ('FieldInfo x :: FieldInfo) (a :: Type) where
+  demote _ _ = M.FieldInfo (demote (Proxy :: Proxy x) (Proxy :: Proxy '())) :: M.FieldInfo a
 
-instance (Demote x, SListI xs) => Demote ('Constructor x :: ConstructorInfo xs) where
-  demote _ = M.Constructor (demote (Proxy :: Proxy x))
+instance (Demote x '(), SListI xs) => Demote ('Constructor x :: ConstructorInfo) (xs :: [Type]) where
+  demote _ _ = M.Constructor (demote (Proxy :: Proxy x) (Proxy :: Proxy '()))
 
-instance (Demote x, Demote a, Demote f) => Demote ('Infix x a f) where
-  demote _ =
+instance (Demote x '(), Demote a '(), Demote f '()) => Demote ('Infix x a f :: ConstructorInfo) ('[y, z] :: [Type]) where
+  demote _ _ =
     M.Infix
-      (demote (Proxy :: Proxy x))
-      (demote (Proxy :: Proxy a))
-      (demote (Proxy :: Proxy f))
+      (demote (Proxy :: Proxy x) (Proxy :: Proxy '()))
+      (demote (Proxy :: Proxy a) (Proxy :: Proxy '()))
+      (demote (Proxy :: Proxy f) (Proxy :: Proxy '()))
 
-instance (Demote x, Demote fis, SListI xs) => Demote ('Record x fis :: ConstructorInfo xs) where
-  demote _ =
+instance (Demote x '(), Demote fis xs, SListI xs) => Demote ('Record x fis :: ConstructorInfo) (xs :: [Type]) where
+  demote _ _ =
     M.Record
-      (demote (Proxy :: Proxy x))
-      (map_NP unWrapDemoted (demote (Proxy :: Proxy fis))) -- TODO: coerce?
+      (demote (Proxy :: Proxy x) (Proxy :: Proxy '()))
+      (map_NP unWrapDemoted (demote (Proxy :: Proxy fis) (Proxy :: Proxy xs))) -- TODO: coerce?
 
-instance Demote 'Nil where
-  demote _ = Nil
+instance Demote '[] '[] where
+  demote _ _ = Nil
 
-instance (Demote x, Demote xs) => Demote (x ':* xs) where
-  demote _ = WrappedDemoted (demote (Proxy :: Proxy x)) :* demote (Proxy :: Proxy xs)
+instance (Demote x i, Demote xs is) => Demote (x ': xs) (i ': is) where
+  demote _ _ =
+       WrappedDemoted (demote (Proxy :: Proxy x) (Proxy :: Proxy i))
+    :* demote (Proxy :: Proxy xs) (Proxy :: Proxy is)
 
-instance Demote 'LeftAssociative where
-  demote _ = LeftAssociative
+instance Demote 'LeftAssociative c where
+  demote _ _ = LeftAssociative
 
-instance Demote 'RightAssociative where
-  demote _ = RightAssociative
+instance Demote 'RightAssociative c where
+  demote _ _ = RightAssociative
 
-instance Demote 'NotAssociative where
-  demote _ = NotAssociative
+instance Demote 'NotAssociative c where
+  demote _ _ = NotAssociative
 
-instance (Demote m, Demote d, Demote cis, SListI xss) => Demote ('ADT m d cis :: DatatypeInfo xss) where
-  demote _ =
+instance (Demote m '(), Demote d '(), Demote cis xss, SListI xss) => Demote ('ADT m d cis :: DatatypeInfo) (xss :: [[Type]]) where
+  demote _ _ =
     M.ADT
-      (demote (Proxy :: Proxy m))
-      (demote (Proxy :: Proxy d))
-      (map_NP unWrapDemoted (demote (Proxy :: Proxy cis)))
+      (demote (Proxy :: Proxy m) (Proxy :: Proxy '()))
+      (demote (Proxy :: Proxy d) (Proxy :: Proxy '()))
+      (map_NP unWrapDemoted (demote (Proxy :: Proxy cis) (Proxy :: Proxy xss)))
 
-instance (Demote m, Demote d, Demote ci) => Demote ('Newtype m d ci) where
-  demote _ =
+instance (Demote m '(), Demote d '(), Demote ci '[ x ], xss ~ '[ '[x] ]) => Demote ('Newtype m d ci :: DatatypeInfo) (xss :: [[Type]]) where
+  demote _ _ =
     M.Newtype
-      (demote (Proxy :: Proxy m))
-      (demote (Proxy :: Proxy d))
-      (demote (Proxy :: Proxy ci))
+      (demote (Proxy :: Proxy m) (Proxy :: Proxy '()))
+      (demote (Proxy :: Proxy d) (Proxy :: Proxy '()))
+      (demote (Proxy :: Proxy ci) (Proxy :: Proxy '[ x ]))
 
-type family DatatypeInfoOf (a :: Type) :: DatatypeInfo (Code a)
+type family DatatypeInfoOf (a :: Type) :: DatatypeInfo
 
-instance {-# OVERLAPPABLE #-} (Demote (DatatypeInfoOf a)) => HasDatatypeInfo a where
-  datatypeInfo _ = demote (Proxy :: Proxy (DatatypeInfoOf a))
+instance {-# OVERLAPPABLE #-} (Demote (DatatypeInfoOf a) (Code a)) => HasDatatypeInfo a where
+  datatypeInfo _ = demote (Proxy :: Proxy (DatatypeInfoOf a)) (Proxy :: Proxy (Code a))

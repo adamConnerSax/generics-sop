@@ -340,3 +340,11 @@ sequence_SOP :: (All SListI xss, Applicative f) => SOP f xss -> f (SOP I xss)
 sequence_NS   = hsequence
 sequence_SOP  = hsequence
 
+-- * Catamorphism
+
+cata_NS :: forall r f xs . (forall y ys . f y -> r (y ': ys)) -> (forall y ys . r ys -> r (y ': ys)) -> NS f xs -> r xs
+cata_NS z s = go
+  where
+    go :: forall ys . NS f ys -> r ys
+    go (Z x) = z x
+    go (S i) = s (go i)
