@@ -9,7 +9,7 @@ import GHC.TypeLits
 import qualified Generics.SOP.Metadata as M
 import Generics.SOP.NP
 import Generics.SOP.Sing
-import Generics.SOP.Universe
+-- import Generics.SOP.Universe
 
 data DatatypeInfo :: Type where
   -- Standard algebraic datatype
@@ -113,7 +113,7 @@ instance (Demote m '(), Demote d '(), Demote ci '[ x ], xss ~ '[ '[x] ]) => Demo
       (demote (Proxy :: Proxy d) (Proxy :: Proxy '()))
       (demote (Proxy :: Proxy ci) (Proxy :: Proxy '[ x ]))
 
-type family DatatypeInfoOf (a :: Type) :: DatatypeInfo
+-- type family DatatypeInfoOf (a :: Type) :: DatatypeInfo
 
-instance {-# OVERLAPPABLE #-} (Demote (DatatypeInfoOf a) (Code a)) => HasDatatypeInfo a where
-  datatypeInfo _ = demote (Proxy :: Proxy (DatatypeInfoOf a)) (Proxy :: Proxy (Code a))
+-- instance {-# OVERLAPPABLE #-} (Demote (DatatypeInfoOf a) (Code a)) => HasDatatypeInfo a where
+--   datatypeInfo _ = demote (Proxy :: Proxy (DatatypeInfoOf a)) (Proxy :: Proxy (Code a))
