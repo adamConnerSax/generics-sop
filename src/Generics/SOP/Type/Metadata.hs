@@ -1,4 +1,4 @@
-{-# LANGUAGE TypeInType, UndecidableInstances #-}
+{-# LANGUAGE PolyKinds, UndecidableInstances #-}
 module Generics.SOP.Type.Metadata where
 
 import Data.Proxy
