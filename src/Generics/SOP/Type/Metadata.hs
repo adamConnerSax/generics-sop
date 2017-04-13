@@ -48,9 +48,9 @@ type instance Demoted DatatypeInfo xss     = M.DatatypeInfo xss
 type instance Demoted ConstructorInfo xs   = M.ConstructorInfo xs
 type instance Demoted FieldInfo x          = M.FieldInfo x
 type instance Demoted [f] xs               = NP (WrapDemoted f) xs
-type instance Demoted Symbol _             = String
-type instance Demoted Nat _                = Int
-type instance Demoted Associativity _      = Associativity
+type instance Demoted Symbol _s            = String
+type instance Demoted Nat _n               = Int
+type instance Demoted Associativity _a     = Associativity
 
 newtype WrapDemoted f a = WrappedDemoted { unWrapDemoted :: Demoted f a }
 
